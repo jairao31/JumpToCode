@@ -1,0 +1,16 @@
+JumpToCode/
+│
+├── extension/                     # Chrome extension source
+│   ├── manifest.json
+│   ├── background.js
+│   ├── content.js
+│   ├── icons/                     # (optional) Extension icons
+│       └── jump-to-code.png
+│
+├── helper-server/                 # Local Node.js service that opens files in VS Code
+│   ├── package.json
+│   └── open-in-editor-server.js
+│
+├── README.md
+├── LICENSE
+├── .gitignore

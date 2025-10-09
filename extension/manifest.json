@@ -1,0 +1,13 @@
+{
+	"manifest_version": 3,
+	"name": "🕵🏻‍♂️ JumpToCode",
+	"description": "A developer tool to instantly locate and open the source code of any locally running UI component in your editor. Navigate, inspect, and edit your UI faster.",
+	"version": "0.6.0",
+	"permissions": ["activeTab", "scripting"],
+	"background": {
+		"service_worker": "background.js"
+	},
+	"action": {
+		"default_title": "Enable JumpToCode"
+	}
+}
