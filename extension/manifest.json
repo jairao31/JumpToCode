@@ -1,13 +1,22 @@
 {
 	"manifest_version": 3,
-	"name": "🕵🏻‍♂️ JumpToCode",
-	"description": "A developer tool to instantly locate and open the source code of any locally running UI component in your editor. Navigate, inspect, and edit your UI faster.",
-	"version": "1.0.0",
+	"name": "JumpToCode",
+	"description": "A developer tool to instantly locate and open the source code of any locally running React UI component in your editor.",
+	"version": "2.0.0",
 	"permissions": ["activeTab", "scripting"],
+	"host_permissions": [
+		"http://localhost/*"
+	],
 	"background": {
 		"service_worker": "background.js"
 	},
 	"action": {
-		"default_title": "Enable JumpToCode"
+		"default_popup": "popup.html",
+		"default_title": "JumpToCode Settings"
+	},
+	"icons": {
+		"16": "icon.png",
+		"48": "icon.png",
+		"128": "icon.png"
 	}
 }

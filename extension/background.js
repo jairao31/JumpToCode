@@ -48,7 +48,7 @@ function initClickToCode() {
 		notification.textContent = message;
 		notification.style.cssText = `
 			position: fixed;
-			top: 20px;
+			bottom: 20px;
 			right: 20px;
 			padding: 12px 20px;
 			background: ${isError ? '#f44336' : '#4CAF50'};
@@ -66,6 +66,10 @@ function initClickToCode() {
 			@keyframes slideIn {
 				from { transform: translateX(400px); opacity: 0; }
 				to { transform: translateX(0); opacity: 1; }
+			}
+			@keyframes slideOut {
+				from { transform: translateX(0); opacity: 1; }
+				to { transform: translateX(400px); opacity: 0; }
 			}
 		`;
 		if (!document.querySelector('style[data-JumpToCode]')) {

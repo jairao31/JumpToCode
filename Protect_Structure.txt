@@ -4,8 +4,9 @@ JumpToCode/
 │   ├── manifest.json
 │   ├── background.js
 │   ├── content.js
-│   ├── icons/                     # (optional) Extension icons
-│       └── jump-to-code.png
+│   ├── icon.png            # Extension icon
+│   ├── popup.html
+│   ├── popup.js
 │
 ├── helper-server/                 # Local Node.js service that opens files in VS Code
 │   ├── package.json
