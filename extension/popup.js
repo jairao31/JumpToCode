@@ -37,6 +37,48 @@ function showMessage(text, type = 'success') {
 	}, 3000);
 }
 
+// Check extension state on popup load
+async function checkExtensionState() {
+	try {
+		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+		if (!tab.url || !tab.url.startsWith('http://localhost:')) {
+			activateBtn.textContent = '🎯 Activate Click Mode';
+			activateBtn.disabled = true;
+			activateBtn.style.opacity = '0.5';
+			activateBtn.style.cursor = 'not-allowed';
+			showMessage('⚠️ Only works on localhost', 'error');
+			return;
+		}
+
+		// Try to check if extension is already active
+		const results = await chrome.scripting.executeScript({
+			target: { tabId: tab.id },
+			func: () => window.clickToCodeEnabled,
+			world: 'MAIN'
+		});
+
+		const isActive = results && results[0] && results[0].result === true;
+		updateButtonState(isActive);
+	} catch (err) {
+		// Extension not injected yet
+		updateButtonState(false);
+	}
+}
+
+// Update button state
+function updateButtonState(isActive) {
+	if (isActive) {
+		activateBtn.textContent = '⏸️ Deactivate Click Mode';
+		activateBtn.classList.remove('primary');
+		activateBtn.classList.add('secondary');
+	} else {
+		activateBtn.textContent = '🎯 Activate Click Mode';
+		activateBtn.classList.remove('secondary');
+		activateBtn.classList.add('primary');
+	}
+}
+
 // Activate click mode
 activateBtn.addEventListener('click', async () => {
 	try {
@@ -54,10 +96,22 @@ activateBtn.addEventListener('click', async () => {
 			world: 'MAIN'
 		});
 
-		showMessage('🎯 Click mode activated!', 'success');
+		// Check new state after toggle
+		const results = await chrome.scripting.executeScript({
+			target: { tabId: tab.id },
+			func: () => window.clickToCodeEnabled,
+			world: 'MAIN'
+		});
 
-		// Close popup after a short delay
-		setTimeout(() => window.close(), 800);
+		const isActive = results && results[0] && results[0].result === true;
+		updateButtonState(isActive);
+
+		showMessage(isActive ? '🎯 Click mode activated!' : '⏸️ Click mode deactivated!', 'success');
+
+		// Close popup after a short delay only if activating
+		if (isActive) {
+			setTimeout(() => window.close(), 800);
+		}
 	} catch (err) {
 		showMessage('❌ Failed to activate: ' + err.message, 'error');
 	}
@@ -76,11 +130,12 @@ testServerBtn.addEventListener('click', async () => {
 // Initialize on load
 (async () => {
 	await checkServer();
+	await checkExtensionState();
 })();
 
 // This function gets injected into the page (same as background.js)
 function initClickToCode() {
-	const VERSION = '0.8.0';
+	const VERSION = '0.9.0';
 
 	console.log(`%c[JumpToCode] v${VERSION} injected!`, 'color: #4CAF50; font-weight: bold; font-size: 14px');
 
@@ -88,6 +143,14 @@ function initClickToCode() {
 	if (window.clickToCodeEnabled !== undefined) {
 		window.clickToCodeEnabled = !window.clickToCodeEnabled;
 		document.body.style.cursor = window.clickToCodeEnabled ? "crosshair" : "auto";
+
+		if (window.clickToCodeEnabled) {
+			attachHoverListener();
+		} else {
+			removeHoverListener();
+			removeHighlight();
+		}
+
 		showNotification(window.clickToCodeEnabled ? "JumpToCode: Enabled" : "JumpToCode: Disabled");
 		console.log(`[JumpToCode] Toggled: ${window.clickToCodeEnabled ? 'ON' : 'OFF'}`);
 		return;
@@ -95,6 +158,9 @@ function initClickToCode() {
 
 	window.clickToCodeEnabled = false;
 	window.clickToCodeVersion = VERSION;
+	window.clickToCodeHoverListener = null;
+	window.clickToCodeHighlightOverlay = null;
+	window.clickToCodeInfoBox = null;
 
 	// Notification system
 	function showNotification(message, isError = false) {
@@ -129,6 +195,10 @@ function initClickToCode() {
 				from { transform: translateX(0); opacity: 1; }
 				to { transform: translateX(400px); opacity: 0; }
 			}
+			@keyframes pulse {
+				0%, 100% { opacity: 0.7; }
+				50% { opacity: 0.9; }
+			}
 		`;
 		if (!document.querySelector('style[data-JumpToCode]')) {
 			style.setAttribute('data-JumpToCode', 'true');
@@ -141,6 +211,178 @@ function initClickToCode() {
 			notification.style.animation = 'slideOut 0.3s ease';
 			setTimeout(() => notification.remove(), 300);
 		}, 3000);
+	}
+
+	// Create highlight overlay
+	function createHighlight() {
+		if (!window.clickToCodeHighlightOverlay) {
+			const overlay = document.createElement('div');
+			overlay.className = 'JumpToCode-highlight';
+			overlay.style.cssText = `
+				position: absolute;
+				pointer-events: none;
+				z-index: 999997;
+				border: 2px solid #4CAF50;
+				background: rgba(76, 175, 80, 0.1);
+				border-radius: 4px;
+				transition: all 0.15s ease;
+				box-shadow: 0 0 0 1px rgba(76, 175, 80, 0.2),
+				            0 0 10px rgba(76, 175, 80, 0.3);
+				animation: pulse 2s ease-in-out infinite;
+			`;
+			document.body.appendChild(overlay);
+			window.clickToCodeHighlightOverlay = overlay;
+		}
+		return window.clickToCodeHighlightOverlay;
+	}
+
+	// Create info box
+	function createInfoBox() {
+		if (!window.clickToCodeInfoBox) {
+			const infoBox = document.createElement('div');
+			infoBox.className = 'JumpToCode-info';
+			infoBox.style.cssText = `
+				position: fixed;
+				top: 20px;
+				left: 50%;
+				transform: translateX(-50%);
+				background: #4CAF50;
+				color: white;
+				padding: 10px 18px;
+				border-radius: 4px;
+				font-family: system-ui, -apple-system, sans-serif;
+				font-size: 13px;
+				z-index: 999998;
+				pointer-events: none;
+				box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+				white-space: nowrap;
+				max-width: 90vw;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				display: flex;
+				align-items: center;
+				gap: 8px;
+			`;
+			document.body.appendChild(infoBox);
+			window.clickToCodeInfoBox = infoBox;
+		}
+		return window.clickToCodeInfoBox;
+	}
+
+	// Get relative file path
+	function getRelativePath(fullPath) {
+		// Remove common prefixes to get relative path
+		let relativePath = fullPath;
+
+		// Remove webpack prefixes
+		relativePath = relativePath.replace(/^webpack:\/\/\//, '');
+		relativePath = relativePath.replace(/^webpack:\/\//, '');
+
+		// Try to extract from common project structures
+		const srcMatch = relativePath.match(/\/src\/(.+)$/);
+		if (srcMatch) return 'src/' + srcMatch[1];
+
+		const appMatch = relativePath.match(/\/app\/(.+)$/);
+		if (appMatch) return 'app/' + appMatch[1];
+
+		const componentsMatch = relativePath.match(/\/components\/(.+)$/);
+		if (componentsMatch) return 'components/' + componentsMatch[1];
+
+		const pagesMatch = relativePath.match(/\/pages\/(.+)$/);
+		if (pagesMatch) return 'pages/' + pagesMatch[1];
+
+		// If no match, return last 2-3 segments of path
+		const pathParts = relativePath.split('/');
+		if (pathParts.length > 3) {
+			return '.../' + pathParts.slice(-2).join('/');
+		}
+
+		return relativePath.split('/').pop(); // fallback to filename
+	}
+
+	// Update highlight position
+	function updateHighlight(element, debugSource) {
+		const overlay = createHighlight();
+		const infoBox = createInfoBox();
+		const rect = element.getBoundingClientRect();
+
+		overlay.style.left = (rect.left + window.scrollX) + 'px';
+		overlay.style.top = (rect.top + window.scrollY) + 'px';
+		overlay.style.width = rect.width + 'px';
+		overlay.style.height = rect.height + 'px';
+		overlay.style.display = 'block';
+
+		if (debugSource) {
+			const relativePath = getRelativePath(debugSource.fileName);
+			const componentInfo = getComponentName(element);
+			infoBox.innerHTML = `
+				<strong style="font-weight: 600;">${componentInfo}</strong> 
+				<span style="opacity: 0.7;">|</span> 
+				<span style="font-family: 'Courier New', monospace; font-size: 12px; opacity: 0.95; font-weight: 600;">${relativePath}:<span style="font-weight: 600;">${debugSource.lineNumber}</span></span>
+			`;
+			infoBox.style.display = 'flex';
+		}
+	}
+
+	// Remove highlight
+	function removeHighlight() {
+		if (window.clickToCodeHighlightOverlay) {
+			window.clickToCodeHighlightOverlay.style.display = 'none';
+		}
+		if (window.clickToCodeInfoBox) {
+			window.clickToCodeInfoBox.style.display = 'none';
+		}
+	}
+
+	// Get component name from fiber
+	function getComponentName(element) {
+		const fiber = getReactFiber(element);
+		if (!fiber) return 'Unknown';
+
+		let current = fiber;
+		let depth = 0;
+
+		while (current && depth < 20) {
+			if (current.type) {
+				if (typeof current.type === 'function') {
+					return current.type.name || current.type.displayName || 'Anonymous';
+				}
+			}
+			current = current.return;
+			depth++;
+		}
+
+		return element.tagName.toLowerCase();
+	}
+
+	// Hover handler
+	function handleHover(e) {
+		if (!window.clickToCodeEnabled) return;
+
+		const fiber = getReactFiber(e.target);
+		if (!fiber) {
+			removeHighlight();
+			return;
+		}
+
+		const debugSource = findDebugSource(fiber);
+		updateHighlight(e.target, debugSource);
+	}
+
+	// Attach hover listener
+	function attachHoverListener() {
+		if (window.clickToCodeHoverListener) return;
+
+		window.clickToCodeHoverListener = handleHover;
+		document.addEventListener('mouseover', window.clickToCodeHoverListener, true);
+	}
+
+	// Remove hover listener
+	function removeHoverListener() {
+		if (window.clickToCodeHoverListener) {
+			document.removeEventListener('mouseover', window.clickToCodeHoverListener, true);
+			window.clickToCodeHoverListener = null;
+		}
 	}
 
 	// Show alert with file location
@@ -188,7 +430,6 @@ function initClickToCode() {
 
 		document.body.appendChild(alertDiv);
 
-		// Copy path functionality
 		document.getElementById('copyPath').addEventListener('click', () => {
 			const textToCopy = `${file}:${line}`;
 			navigator.clipboard.writeText(textToCopy).then(() => {
@@ -199,12 +440,10 @@ function initClickToCode() {
 			});
 		});
 
-		// Close button
 		document.getElementById('closeAlert').addEventListener('click', () => {
 			alertDiv.remove();
 		});
 
-		// Close on escape key
 		const escHandler = (e) => {
 			if (e.key === 'Escape') {
 				alertDiv.remove();
@@ -225,7 +464,6 @@ function initClickToCode() {
 					key.startsWith("__reactInternalInstance$") ||
 					key.startsWith("__reactProps$") ||
 					key.startsWith("__reactContainer$")) {
-					console.log(`[JumpToCode] ✅ Found fiber at attempt ${attempts}:`, key);
 
 					let fiber = el[key];
 					if (key.startsWith("__reactContainer$") && fiber.current) {
@@ -302,8 +540,9 @@ function initClickToCode() {
 				showNotification(`✅ Opened in VS Code!`);
 				window.clickToCodeEnabled = false;
 				document.body.style.cursor = "auto";
+				removeHoverListener();
+				removeHighlight();
 			} else {
-				// Check if we should show alert
 				if (result.alertUser) {
 					if (result.vscodeNotInstalled) {
 						showFileLocationAlert(result.file, result.line, result.error);
@@ -325,7 +564,8 @@ function initClickToCode() {
 	// Enable immediately
 	window.clickToCodeEnabled = true;
 	document.body.style.cursor = "crosshair";
-	showNotification("JumpToCode: Click any React component");
+	attachHoverListener();
+	showNotification("JumpToCode: Hover over any React component");
 
-	console.log('[JumpToCode] Ready! Click any component.');
+	console.log('[JumpToCode] Ready! Hover and click any component.');
 }

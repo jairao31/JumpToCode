@@ -64,8 +64,8 @@
 	function checkReactSetup() {
 		const hasReact = typeof window.React !== 'undefined';
 		const hasDevTools = typeof window.__REACT_DEVTOOLS_GLOBAL_HOOK__ !== 'undefined';
-		const testEl = document.querySelector('[data-reactroot], [data-reactid]') || document.body;
-		const hasReactKeys = Object.keys(testEl).some(k => k.includes('react') || k.includes('fiber'));
+		const testEl = document.querySelector('[data-reactroot], [data-reactid]')| document.body;
+		const hasReactKeys = Object.keys(testEl).some(k => k.includes('react')| k.includes('fiber'));
 
 		// Detect UI framework
 		const hasChakra = !!document.querySelector('[class*="chakra"]');
@@ -269,7 +269,7 @@
 				for (let i = 0; i < el.children.length; i++) {
 					const child = el.children[i];
 					for (const key in child) {
-						if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
+						if (key.startsWith("__reactFiber$")| key.startsWith("__reactInternalInstance$")) {
 							console.log('[JumpToCode] ✅ Found fiber on child element');
 							return child[key];
 						}
@@ -282,7 +282,7 @@
 				// Try previous sibling
 				if (el.previousElementSibling) {
 					for (const key in el.previousElementSibling) {
-						if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
+						if (key.startsWith("__reactFiber$")| key.startsWith("__reactInternalInstance$")) {
 							console.log('[JumpToCode] ✅ Found fiber on previous sibling');
 							return el.previousElementSibling[key];
 						}
@@ -291,7 +291,7 @@
 				// Try next sibling
 				if (el.nextElementSibling) {
 					for (const key in el.nextElementSibling) {
-						if (key.startsWith("__reactFiber$") || key.startsWith("__reactInternalInstance$")) {
+						if (key.startsWith("__reactFiber$")| key.startsWith("__reactInternalInstance$")) {
 							console.log('[JumpToCode] ✅ Found fiber on next sibling');
 							return el.nextElementSibling[key];
 						}
@@ -364,7 +364,7 @@
 		let depth = 0;
 		const maxDepth = 50; // Increased from 30
 
-		console.log('[JumpToCode] Starting fiber traversal from:', fiber.type?.name || fiber.type || 'unknown');
+		console.log('[JumpToCode] Starting fiber traversal from:', fiber.type?.name| fiber.type| 'unknown');
 
 		while (current && depth < maxDepth) {
 			// Check current fiber
@@ -391,7 +391,7 @@
 
 			// Check if this is a composite component (class or function)
 			if (current.type && typeof current.type === 'function') {
-				const componentName = current.type.name || current.type.displayName || 'anonymous';
+				const componentName = current.type.name| current.type.displayName| 'anonymous';
 				console.log(`[JumpToCode] Depth ${depth}: Component "${componentName}"`);
 			}
 
